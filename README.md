@@ -1,7 +1,3 @@
-Here’s a professional README you can use for your GitHub project. Just copy, paste, and adjust any details as needed!
-
----
-
 # 🎬 Movie Search App
 
 A modern, responsive React web application for discovering movies, viewing detailed information, and watching trailers. Built with React, Tailwind CSS, OMDB API, and YouTube Data API.
