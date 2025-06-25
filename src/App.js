@@ -3,6 +3,7 @@ import SearchBar from "./components/SearchBar";
 import MovieCard from "./components/MovieCard";
 import MovieDetail from "./components/MovieDetail";
 import SkeletonCard from "./components/SkeletonCard";
+import TrailerModal from "./components/TrailerModal";
 
 const OMDB_API_KEY = "68f968ed"; // Replace with your OMDB API key
 
@@ -12,6 +13,10 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedMovie, setSelectedMovie] = useState(null);
+  const [trailerMovie, setTrailerMovie] = useState(null);
+  const [trailerId, setTrailerId] = useState(null);
+  const [trailerError, setTrailerError] = useState("");
+  const [loadingTrailer, setLoadingTrailer] = useState(false);
   const [favorites, setFavorites] = useState(() => {
     const saved = localStorage.getItem("favorites");
     return saved ? JSON.parse(saved) : [];
@@ -39,6 +44,7 @@ function App() {
     westernMovies: []
   });
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [filters, setFilters] = useState({ genre: "Any", year: "" });
 
   useEffect(() => {
     localStorage.setItem("favorites", JSON.stringify(favorites));
@@ -135,26 +141,33 @@ function App() {
     );
   };
 
-  const searchMovies = async (searchTerm) => {
+  const searchMovies = async (searchTerm, filterOptions = filters) => {
     setQuery(searchTerm);
+    setFilters(filterOptions);
     setLoading(true);
     setError("");
     setSelectedMovie(null);
     try {
-      const res = await fetch(
-        `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&s=${searchTerm}`
-      );
+      let url = `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&s=${searchTerm}`;
+      if (filterOptions.year) {
+        url += `&y=${filterOptions.year}`;
+      }
+      const res = await fetch(url);
       const data = await res.json();
       if (data.Response === "True" && data.Search) {
-        // Fetch detailed info for search results to get posters
+        // Fetch detailed info for search results to get genres
         const detailedMovies = await Promise.all(
           data.Search.map(async (movie) => {
             const details = await fetchMovieDetails(movie.imdbID);
             return details || movie;
           })
         );
-        // For search results, show all movies regardless of image availability
-        setMovies(detailedMovies);
+        // Filter by genre if needed
+        let filtered = detailedMovies;
+        if (filterOptions.genre && filterOptions.genre !== "Any") {
+          filtered = filtered.filter(m => m.Genre && m.Genre.split(", ").includes(filterOptions.genre));
+        }
+        setMovies(filtered);
       } else {
         setMovies([]);
         setError(data.Error || "No results found.");
@@ -185,6 +198,32 @@ function App() {
     setLoading(false);
   };
 
+  const handleSeeDetails = (movie) => {
+    setSelectedMovie(movie);
+  };
+
+  const handleWatchTrailer = async (movie) => {
+    setTrailerMovie(movie);
+    setTrailerError("");
+    setTrailerId(null);
+    setLoadingTrailer(true);
+    try {
+      const q = encodeURIComponent(`${movie.Title} trailer`);
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q=${q}&key=AIzaSyBpaBUlohDqA00m5hBRWrC0J0CbfM7sgn0`
+      );
+      const data = await res.json();
+      if (data.items && data.items.length > 0) {
+        setTrailerId(data.items[0].id.videoId);
+      } else {
+        setTrailerError("Trailer not found.");
+      }
+    } catch (err) {
+      setTrailerError("Failed to fetch trailer.");
+    }
+    setLoadingTrailer(false);
+  };
+
   const renderCategorySection = (title, movies, key) => (
     <div key={key} className="mb-8">
       <h2 className="text-xl font-semibold mb-4 text-gray-800">{title}</h2>
@@ -202,7 +241,9 @@ function App() {
               movie={movie}
               isFavorite={isFavorite(movie)}
               onToggleFavorite={toggleFavorite}
-              onClick={() => fetchMovieDetail(movie.imdbID)}
+              onSeeDetails={handleSeeDetails}
+              onWatchTrailer={handleWatchTrailer}
+              loadingTrailer={loadingTrailer && trailerMovie && trailerMovie.imdbID === movie.imdbID}
             />
           ))}
         </div>
@@ -229,7 +270,9 @@ function App() {
                   movie={movie}
                   isFavorite={true}
                   onToggleFavorite={toggleFavorite}
-                  onClick={() => fetchMovieDetail(movie.imdbID)}
+                  onSeeDetails={handleSeeDetails}
+                  onWatchTrailer={handleWatchTrailer}
+                  loadingTrailer={loadingTrailer && trailerMovie && trailerMovie.imdbID === movie.imdbID}
                 />
               ))}
             </div>
@@ -285,7 +328,9 @@ function App() {
                       movie={movie}
                       isFavorite={isFavorite(movie)}
                       onToggleFavorite={toggleFavorite}
-                      onClick={() => fetchMovieDetail(movie.imdbID)}
+                      onSeeDetails={handleSeeDetails}
+                      onWatchTrailer={handleWatchTrailer}
+                      loadingTrailer={loadingTrailer && trailerMovie && trailerMovie.imdbID === movie.imdbID}
                     />
                   ))}
                 </div>
@@ -296,6 +341,14 @@ function App() {
 
         {selectedMovie && (
           <MovieDetail movie={selectedMovie} onClose={() => setSelectedMovie(null)} />
+        )}
+        {trailerMovie && (
+          <TrailerModal
+            videoId={trailerId}
+            onClose={() => { setTrailerMovie(null); setTrailerId(null); }}
+            error={trailerError}
+            loading={loadingTrailer}
+          />
         )}
       </div>
     </div>
