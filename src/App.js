@@ -179,25 +179,6 @@ function App() {
     setLoading(false);
   };
 
-  const fetchMovieDetail = async (imdbID) => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(
-        `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${imdbID}&plot=full`
-      );
-      const data = await res.json();
-      if (data.Response === "True") {
-        setSelectedMovie(data);
-      } else {
-        setError(data.Error || "Failed to fetch movie details.");
-      }
-    } catch (err) {
-      setError("Failed to fetch movie details.");
-    }
-    setLoading(false);
-  };
-
   const handleSeeDetails = (movie) => {
     setSelectedMovie(movie);
   };
